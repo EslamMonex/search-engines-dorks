@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dork Search Tool</title>
+
+<style>
+body { font-family: Arial, sans-serif; background:#0f172a; color:#e5e7eb; margin:0; padding:20px; }
+h1 { margin-bottom:10px; }
+input, button, textarea { padding:8px; margin:5px 0; border-radius:8px; border:none; }
+input, textarea { width:100%; }
+button { cursor:pointer; background:#2563eb; color:white; margin-right:5px; }
+button:hover { background:#1d4ed8; }
+.deleteBtn { background:#dc2626; }
+.deleteBtn:hover { background:#b91c1c; }
+.editBtn { background:#f59e0b; }
+.editBtn:hover { background:#d97706; }
+.card { background:#111827; padding:15px; border-radius:12px; margin-top:15px; }
+.dork { padding:10px; margin:8px 0; background:#1f2937; border-radius:8px; }
+.dork-text { cursor:pointer; margin-bottom:6px; }
+.dork-text:hover { color:#93c5fd; }
+.engines label { margin-right:15px; }
+</style>
+</head>
+
+<body>
+
+<h1>Search Engine Dork Tool</h1>
+
+<div class="card">
+<label>Target Domain:</label>
+<input type="text" id="domain" placeholder="example.com" />
+
+<div class="engines">
+<label><input type="checkbox" value="google" checked> Google</label>
+<label><input type="checkbox" value="bing" checked> Bing</label>
+<label><input type="checkbox" value="yandex" checked> Yandex</label>
+<label><input type="checkbox" value="duckduckgo" checked> DuckDuckGo</label>
+</div>
+</div>
+
+<div class="card">
+<h3>Add New Dork</h3>
+<textarea id="newDork" rows="2" placeholder="Example: inurl:admin"></textarea>
+<button onclick="addDork()">Add Dork</button>
+</div>
+
+<div class="card">
+<h3>Dorks (click text to search)</h3>
+<div id="dorkList"></div>
+</div>
+
+<script>
+
+const defaultDorks = [
+
+  // Sensitive / juicy file extensions
+  '(ext:log | ext:txt | ext:conf | ext:cnf | ext:ini | ext:env | ext:sh | ext:bak | ext:backup | ext:swp | ext:old | ext:~ | ext:git | ext:svn | ext:htpasswd | ext:htaccess | ext:json | ext:xml)',
+
+  // Interesting documents and archives
+  '(filetype:pdf | filetype:doc | filetype:docx | filetype:xls | filetype:xlsx | filetype:ppt | filetype:pptx | filetype:zip | filetype:rar | filetype:tar.gz | filetype:tgz | filetype:csv | filetype:sql | filetype:dat | filetype:vcf)',
+
+  // Web technologies / extensions
+  '(ext:asp | ext:jsp | ext:aspx | ext:jspx | ext:do | ext:action | ext:php)',
+
+  // PHP with parameters
+  '(ext:php inurl:?)',
+
+  // Admin / panels / dashboards
+  '(inurl:admin | inurl:dashboard | inurl:secure)',
+
+  // Auth pages
+  '(inurl:login | inurl:signin | inurl:register | inurl:signup)',
+
+  // API and endpoints
+  '(inurl:api | inurl:/api/ | inurl:/v1 | inurl:/v2 | inurl:/v3 | inurl:rest)',
+
+  // API documentation
+  '(inurl:swagger | inurl:api-docs | inurl:apidocs | inurl:redoc | inurl:openapi | intitle:"Swagger UI")',
+
+  // GraphQL & explorers
+  '("/graphql" | "/graphiql" | "/altair" | "/playground")',
+
+  // Test and staging environments
+  '(inurl:test | inurl:env | inurl:dev | inurl:staging | inurl:sandbox | inurl:debug | inurl:temp | inurl:internal | inurl:demo)',
+
+  // High‑value keywords in URLs
+  '(inurl:conf | inurl:cgi | inurl:bin | inurl:etc | inurl:root | inurl:sql | inurl:backup)',
+
+  // URLs with parameters
+  'inurl:&',
+
+  // Error messages and stack traces
+  '(inurl:error | inurl:exception | intitle:"exception" | intitle:"failure" | intitle:"server at" | "database error" | "SQL syntax" | "undefined index" | "unhandled exception" | "stack trace")',
+
+  // File upload endpoints
+  '(intext:"choose file" | intext:"select file" | intext:"upload")',
+
+  // Sensitive parameter names
+  '(inurl:email= | inurl:phone= | inurl:name= | inurl:user=)',
+
+  // XSS‑prone parameters
+  '(inurl:q= | inurl:s= | inurl:search= | inurl:query= | inurl:keyword= | inurl:lang=)',
+
+  // Open redirect parameters
+  '(inurl:url= | inurl:return= | inurl:next= | inurl:redirect= | inurl:redir= | inurl:ret=)',
+
+  // SQLi‑prone parameters
+  '(inurl:id= | inurl:pid= | inurl:cat= | inurl:category= | inurl:action= | inurl:sid=)',
+
+  // SSRF‑prone parameters
+  '(inurl:url= | inurl:path= | inurl:dest= | inurl:data= | inurl:domain=)',
+
+  // LFI‑prone parameters
+  '(inurl:file= | inurl:folder= | inurl:include | inurl:inc= | inurl:doc= | inurl:dir=)',
+
+  // RCE‑prone parameters
+  '(inurl:cmd | inurl:exec= | inurl:code= | inurl:run= | inurl:ping=)',
+
+  // AEM paths
+  '("/content/dam" | "/jcr:content" | "/crx/de" | "/etc/clientlibs")',
+
+  // Public code / paste leaks
+  'site:pastebin.com',
+  'site:jsfiddle.net',
+  'site:codepen.io',
+  'site:codebeautify.org',
+
+  // Cloud storage exposures
+  'site:s3.amazonaws.com',
+  'site:blob.core.windows.net',
+  'site:googleapis.com',
+  'site:drive.google.com',
+  'site:onedrive.live.com',
+  'site:digitaloceanspaces.com',
+  'site:sharepoint.com',
+
+  // Firebase / JFrog
+  'site:firebaseio.com',
+  'site:jfrog.io',
+
+  // Third‑party exposure
+  'site:join.slack.com',
+  'site:notion.site',
+  'site:notion.io',
+  'site:readme.io',
+  'site:readthedocs.org',
+  'site:trello.com',
+  'site:groups.google.com "Orwa Inc"',
+  'site:docs.google.com/spreadsheets "Orwa Inc."',
+  'site:grok.com/share "authorization"'
+];
+
+let dorks = [];
+
+// Load dorks from localStorage
+function loadDorks() {
+  const stored = localStorage.getItem("dorks");
+  if (stored) {
+    dorks = JSON.parse(stored);
+  } else {
+    dorks = [...defaultDorks];
+    saveDorks();
+  }
+  renderDorks();
+}
+
+// Save dorks
+function saveDorks() {
+  localStorage.setItem("dorks", JSON.stringify(dorks));
+}
+
+// Render dorks
+function renderDorks() {
+  const list = document.getElementById('dorkList');
+  list.innerHTML = '';
+
+  const domainValue = document.getElementById('domain').value || 'example.com';
+
+  dorks.forEach((dork, index) => {
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'dork';
+
+    const textDiv = document.createElement('div');
+    textDiv.className = 'dork-text';
+
+    // Avoid duplicate site:
+    const fullQuery = dork.includes('site:')
+      ? dork
+      : `site:"${domainValue}" ${dork}`;
+
+    textDiv.textContent = fullQuery;
+    textDiv.onclick = () => searchDork(fullQuery);
+
+    const editBtn = document.createElement('button');
+    editBtn.textContent = 'Edit';
+    editBtn.className = 'editBtn';
+    editBtn.onclick = () => editDork(index);
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.textContent = 'Delete';
+    deleteBtn.className = 'deleteBtn';
+    deleteBtn.onclick = () => deleteDork(index);
+
+    wrapper.appendChild(textDiv);
+    wrapper.appendChild(editBtn);
+    wrapper.appendChild(deleteBtn);
+
+    list.appendChild(wrapper);
+  });
+}
+
+// Add dork (prevent duplicates)
+function addDork() {
+  const newDork = document.getElementById('newDork').value.trim();
+  if (!newDork) return;
+
+  if (dorks.includes(newDork)) {
+    alert("Duplicate dork not added.");
+    return;
+  }
+
+  dorks.push(newDork);
+  document.getElementById('newDork').value = '';
+  saveDorks();
+  renderDorks();
+}
+
+// Delete
+function deleteDork(index) {
+  if (!confirm('Delete this dork?')) return;
+  dorks.splice(index, 1);
+  saveDorks();
+  renderDorks();
+}
+
+// Edit
+function editDork(index) {
+  const updated = prompt('Edit dork:', dorks[index]);
+  if (updated !== null && updated.trim() !== '') {
+    dorks[index] = updated.trim();
+    saveDorks();
+    renderDorks();
+  }
+}
+
+// Search
+function searchDork(fullQuery) {
+  const engines = Array.from(document.querySelectorAll('.engines input:checked')).map(e => e.value);
+
+  if (engines.length === 0) {
+    alert('Select at least one search engine');
+    return;
+  }
+
+  const query = encodeURIComponent(fullQuery);
+
+  engines.forEach(engine => {
+    let url = '';
+    if (engine === 'google') url = `https://www.google.com/search?q=${query}`;
+    if (engine === 'bing') url = `https://www.bing.com/search?q=${query}`;
+    if (engine === 'yandex') url = `https://yandex.com/search/?text=${query}`;
+    if (engine === 'duckduckgo') url = `https://duckduckgo.com/?q=${query}`;
+    if (url) window.open(url, '_blank');
+  });
+}
+
+// Re-render when domain changes
+document.getElementById('domain').addEventListener('input', renderDorks);
+
+// Init
+loadDorks();
+
+</script>
+</body>
+</html>
